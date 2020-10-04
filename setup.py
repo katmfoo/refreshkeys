@@ -11,7 +11,7 @@ setup(
     packages=['refreshkeys'],
     entry_points={
         'console_scripts': [
-            'refreshkeys=refreshkeys:main
+            'refreshkeys=refreshkeys:main'
         ]
     }
 )
