@@ -3,6 +3,7 @@ import sys
 import os
 import json
 import subprocess
+import pexpect
 
 # refreshkeys, script to refresh ssh/gpg key passphrases in keychain using 1password
 # source: https://github.com/pricheal/refreshkeys
@@ -78,8 +79,27 @@ def main():
     except:
         sys.exit('refreshkeys failed, error retrieving passphrases from 1password')
 
-    print(ssh_key_passphrase)
-    print(gpg_key_passphrase)
+    try:
+        # clear keychain
+        subprocess.run('keychain --clear --agents ssh,gpg', shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        # run keychain
+        process = pexpect.spawn('keychain --quiet --nogui --timeout 1440 --agents ssh,gpg id_rsa 2A70B83FD3493624')
+
+        # wait for ssh passphrase prompt
+        process.expect('Enter passphrase for')
+        process.sendline(ssh_key_passphrase)
+
+        # wait for gpg passphrase prompt
+        process.expect('Passphrase:')
+        process.sendline(gpg_key_passphrase)
+
+        # wait for process to complete
+        process.wait()
+    except:
+        sys.exit('refreshkeys failed, keychain unsuccessful')
+
+    print('refreshkeys successful')
 
 if __name__ == "__main__":
     main()
