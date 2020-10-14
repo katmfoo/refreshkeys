@@ -84,11 +84,31 @@ def main():
         subprocess.run('keychain --clear --agents ssh,gpg', shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
         # run keychain
-        process = pexpect.spawn('keychain --quiet --nogui --timeout 1440 --agents ssh,gpg id_rsa 2A70B83FD3493624')
+        process = pexpect.spawn('keychain --eval --quiet --nogui --timeout 1440 --agents ssh,gpg id_rsa 2A70B83FD3493624')
+
+        #process.expect('SSH_AUTH_SOCK=')
+        #ssh_auth_sock = process.readline().decode('utf-8').split(';')[0]
+
+        #process.expect('SSH_AGENT_PID=')
+        #ssh_agent_pid = process.readline().decode('utf-8').split(';')[0];
+
+        #process.expect('GPG_AGENT_INFO=')
+        #gpg_agent_info = process.readline().decode('utf-8').split(';')[0]
+
+        #process.interact()
+
+        #print(ssh_auth_sock)
+        #print(ssh_agent_pid)
+        #print(gpg_agent_info)
 
         # wait for ssh passphrase prompt
         process.expect('Enter passphrase for')
         process.sendline(ssh_key_passphrase)
+
+        # grab keychain eval output
+        eval_output = process.before.decode('utf-8').replace('\r', '')
+
+        print(eval_output)
 
         # wait for gpg passphrase prompt
         process.expect('Passphrase:')
@@ -96,10 +116,11 @@ def main():
 
         # wait for process to complete
         process.wait()
+
     except:
         sys.exit('refreshkeys failed, keychain unsuccessful')
 
-    print('refreshkeys successful')
+    #print('refreshkeys successful')
 
 if __name__ == "__main__":
     main()
