@@ -12,16 +12,11 @@ def program_installed(name: str) -> bool:
     """Returns whether or not the given program is installed on the system"""
     return distutils.spawn.find_executable(name) is not None
 
-def main():
-    """Main logic of script"""
+def get_passphrases():
+    """Gets ssh and gpg key passphrases from 1password"""
 
     OP_ADDRESS = "https://my.1password.com"
     OP_EMAIL = "patrickricheal@gmail.com"
-
-    # ensure necessary command line tools are installed
-    if not program_installed('jq'): sys.exit('refreshkeys failed, jq not installed')
-    if not program_installed('op'): sys.exit('refreshkeys failed, 1password cli not installed')
-    if not program_installed('keychain'): sys.exit('refreshkeys failed, keychain not installed')
 
     # determine if we need to do the first time 1password signin or not
     first_time_signin = True
@@ -43,7 +38,7 @@ def main():
     else:
         process = subprocess.run('op signin my --raw', shell=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
     if process.returncode != 0:
-        sys.exit('refreshkeys failed, 1password login unsuccessful')
+        sys.exit("Failed, 1password login unsuccessful")
     TOKEN = process.stdout.decode('utf-8')
 
     # get key passphrases from 1password
@@ -59,8 +54,8 @@ def main():
             if document['overview']['title'] == "GPG private key":
                 gpg_key_uuid = document['uuid']
 
-        def get_passphrase(document_uuid):
-            """Function to get passphrase from 1password document given its uuid"""
+        def get_passphrase_from_item(document_uuid):
+            """Function to get passphrase from 1password item given its uuid"""
             process = subprocess.run('op get item ' + document_uuid + " --session " + TOKEN, shell=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
             ssh_document = json.loads(process.stdout.decode('utf-8'))
             for section in ssh_document['details']['sections']:
@@ -70,57 +65,57 @@ def main():
             return None
 
         # get passphrases
-        ssh_key_passphrase = get_passphrase(ssh_key_uuid)
-        gpg_key_passphrase = get_passphrase(gpg_key_uuid)
+        ssh_key_passphrase = get_passphrase_from_item(ssh_key_uuid)
+        gpg_key_passphrase = get_passphrase_from_item(gpg_key_uuid)
 
         if not ssh_key_passphrase or not gpg_key_passphrase:
             raise Exception()
 
-    except:
-        sys.exit('refreshkeys failed, error retrieving passphrases from 1password')
-
-    try:
-        # clear keychain
-        subprocess.run('keychain --clear --agents ssh,gpg', shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-        # run keychain
-        process = pexpect.spawn('keychain --eval --quiet --nogui --timeout 1440 --agents ssh,gpg id_rsa 2A70B83FD3493624')
-
-        #process.expect('SSH_AUTH_SOCK=')
-        #ssh_auth_sock = process.readline().decode('utf-8').split(';')[0]
-
-        #process.expect('SSH_AGENT_PID=')
-        #ssh_agent_pid = process.readline().decode('utf-8').split(';')[0];
-
-        #process.expect('GPG_AGENT_INFO=')
-        #gpg_agent_info = process.readline().decode('utf-8').split(';')[0]
-
-        #process.interact()
-
-        #print(ssh_auth_sock)
-        #print(ssh_agent_pid)
-        #print(gpg_agent_info)
-
-        # wait for ssh passphrase prompt
-        process.expect('Enter passphrase for')
-        process.sendline(ssh_key_passphrase)
-
-        # grab keychain eval output
-        eval_output = process.before.decode('utf-8').replace('\r', '')
-
-        print(eval_output)
-
-        # wait for gpg passphrase prompt
-        process.expect('Passphrase:')
-        process.sendline(gpg_key_passphrase)
-
-        # wait for process to complete
-        process.wait()
+        return {'ssh': ssh_key_passphrase, 'gpg': gpg_key_passphrase}
 
     except:
-        sys.exit('refreshkeys failed, keychain unsuccessful')
+        sys.exit("Failed, 1password login unsuccessful")
 
-    #print('refreshkeys successful')
+def main():
+    """Main logic of script"""
+
+    # ensure necessary command line tools are installed
+    if not program_installed('jq'): sys.exit('Failed, jq not installed')
+    if not program_installed('op'): sys.exit('Failed, 1password cli not installed')
+    if not program_installed('keychain'): sys.exit('Failed, keychain not installed')
+
+    # run keychain
+    process = pexpect.spawn('keychain --eval --quiet --nogui --timeout 1440 --agents ssh,gpg id_rsa 2A70B83FD3493624')
+
+    # initiate passphrases (so we only do it in one of the two below iterations)
+    passphrases = None
+
+    # attempt the following twice (once for ssh and the other for gpg)
+    for i in range(0, 2):
+
+        # expect either ssh prompt, gpg prompt, or eof (eof if neither passphrase is needed)
+        index = process.expect(['Enter passphrase for', 'Please enter the passphrase', pexpect.EOF])
+
+        # if we got an ssh or gpg prompt, get passphrases from 1password
+        if (index == 0 or index == 1) and not passphrases:
+            passphrases = get_passphrases()
+
+        # if we are on the first iteration (so the first expect call), get the eval
+        # output from keychain and print it to standard out
+        if i == 0:
+            eval_output = process.before.decode('utf-8').replace('\r', '')
+            print(eval_output)
+
+        # send passphrase if necessary, or finish
+        if index == 0: # ssh prompt
+            process.sendline(passphrases['ssh'])
+        elif index == 1: # gpg prompt
+            process.sendline(passphrases['gpg'])
+        elif index == 2: # no prompt (eof), we are done
+            break
+
+    # wait for process to finish before ending script
+    process.wait()
 
 if __name__ == "__main__":
     main()
