@@ -79,6 +79,12 @@ def get_passphrases():
 def main():
     """Main logic of script"""
 
+    # determine if we are in 'eval mode' (eval mode outputs commands from keychain to be ran and
+    # only asks for password if necessary)
+    eval_mode = False
+    if len(sys.argv) > 1 and sys.argv[1] == '--eval':
+        eval_mode = True
+
     # ensure necessary command line tools are installed
     if not program_installed('jq'): sys.exit('Failed, jq not installed')
     if not program_installed('op'): sys.exit('Failed, 1password cli not installed')
@@ -96,13 +102,14 @@ def main():
         # expect either ssh prompt, gpg prompt, or eof (eof if neither passphrase is needed)
         index = process.expect(['Enter passphrase for', 'Please enter the passphrase', pexpect.EOF])
 
-        # if we got an ssh or gpg prompt, get passphrases from 1password
-        if (index == 0 or index == 1) and not passphrases:
+        # if in eval mode, only get passphrases from 1password if we got a prompt from keychian (if not
+        # in eval mode, always prompt)
+        if (index == 0 or index == 1 or not eval_mode) and not passphrases:
             passphrases = get_passphrases()
 
-        # if we are on the first iteration (so the first expect call), get the eval
+        # if we are on the first iteration (so the first expect call) and in eval mode, get the eval
         # output from keychain and print it to standard out
-        if i == 0:
+        if i == 0 and eval_mode:
             eval_output = process.before.decode('utf-8').replace('\r', '')
             print(eval_output)
 
@@ -116,6 +123,10 @@ def main():
 
     # wait for process to finish before ending script
     process.wait()
+
+    # output success message is not in eval mode
+    if not eval_mode:
+        print("Success, keychain refreshed")
 
 if __name__ == "__main__":
     main()
