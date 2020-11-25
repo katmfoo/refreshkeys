@@ -34,7 +34,7 @@ def get_passphrases():
     # signin to 1password cli to get token
     if first_time_signin:
         # not sure why, but can't do stderr=subprocess.DEVNULL otherwise the signin prompt is not shown (not the case for the non first time signin)
-        process = subprocess.run('op signin my ' + OP_EMAIL + '--raw', shell=True, stdout=subprocess.PIPE)
+        process = subprocess.run('op signin my ' + OP_EMAIL + ' --raw', shell=True, stdout=subprocess.PIPE)
     else:
         process = subprocess.run('op signin my --raw', shell=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
     if process.returncode != 0:
