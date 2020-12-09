@@ -12,5 +12,5 @@ pinentry-program /usr/bin/pinentry-tty
 * Install with `pip install git+https://github.com/pricheal/refreshkeys.git`
 * Add the following to your `.bashrc`:
 ```
-eval $(refreshkeys)
+eval $(refreshkeys --eval)
 ```
