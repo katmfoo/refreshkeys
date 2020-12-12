@@ -4,9 +4,15 @@ import os
 import json
 import subprocess
 import pexpect
+import signal
 
 # refreshkeys, script to refresh ssh/gpg key passphrases in keychain using 1password
 # source: https://github.com/pricheal/refreshkeys
+
+# catch sigint
+def signal_handler(sig, frame):
+    sys.exit("\nFailed, interrupted")
+signal.signal(signal.SIGINT, signal_handler)
 
 def program_installed(name: str) -> bool:
     """Returns whether or not the given program is installed on the system"""
@@ -140,7 +146,4 @@ def main():
         print("Success, keychain refreshed")
 
 if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        sys.exit('\nFailed, interrupted')
+    main()
