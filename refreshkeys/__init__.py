@@ -102,6 +102,9 @@ def main():
     # initiate passphrases (so we only do it in one of the two below iterations)
     passphrases = None
 
+    # whether or not we actually refreshed an agent
+    actually_refreshed = False
+
     # attempt the following twice (once for ssh and the other for gpg)
     for i in range(0, 2):
 
@@ -122,16 +125,18 @@ def main():
         # send passphrase if necessary, or finish
         if index == 0: # ssh prompt
             process.sendline(passphrases['ssh'])
+            actually_refreshed = True
         elif index == 1: # gpg prompt
             process.sendline(passphrases['gpg'])
+            actually_refreshed = True
         elif index == 2: # no prompt (eof), we are done
             break
 
     # wait for process to finish before ending script
     process.wait()
 
-    # output success message is not in eval mode
-    if not eval_mode:
+    # output success message
+    if actually_refreshed and not eval_mode:
         print("Success, keychain refreshed")
 
 if __name__ == "__main__":
