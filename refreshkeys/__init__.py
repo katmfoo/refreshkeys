@@ -21,28 +21,23 @@ def program_installed(name: str) -> bool:
 def get_passphrases():
     """Gets ssh and gpg key passphrases from 1password"""
 
-    OP_ADDRESS = "https://my.1password.com"
-    OP_EMAIL = "patrickricheal@gmail.com"
+    # make sure the 1password account exists locally
+    process = subprocess.run('op account list --format json', shell=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    if process.returncode != 0:
+        sys.exit("Failed, 1password couldn't list accounts")
+    op_accounts = json.loads(process.stdout.decode('utf-8'))
 
-    # determine if we need to do the first time 1password signin or not
-    first_time_signin = True
-    try:
-        path = os.getenv('HOME') + '/.op/config'
-        with open(path) as f:
-            data = json.load(f)
-        for account in data['accounts']:
-            if account['url'] == OP_ADDRESS and account['email'] == OP_EMAIL:
-                first_time_signin = False
-                break
-    except:
-        pass
+    found_account = False
+    for account in op_accounts:
+        if account['shorthand'] == "my":
+            found_account = True
+            break
+
+    if found_account == False:
+        sys.exit("Failed, 1password account not found");
 
     # signin to 1password cli to get token
-    if first_time_signin:
-        # not sure why, but can't do stderr=subprocess.DEVNULL otherwise the signin prompt is not shown (not the case for the non first time signin)
-        process = subprocess.run('op signin my ' + OP_EMAIL + ' --raw', shell=True, stdout=subprocess.PIPE)
-    else:
-        process = subprocess.run('op signin my --raw', shell=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    process = subprocess.run('op signin --account my.1password.com --raw', shell=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
     if process.returncode != 0:
         sys.exit("Failed, 1password login unsuccessful")
     TOKEN = process.stdout.decode('utf-8')
@@ -50,24 +45,23 @@ def get_passphrases():
     # get key passphrases from 1password
     try:
         # get list of documents from 1password
-        process = subprocess.run('op list documents --session ' + TOKEN, shell=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        process = subprocess.run('op document list --format json --session ' + TOKEN, shell=True, stdout=subprocess.PIPE)
         op_documents = json.loads(process.stdout.decode('utf-8'))
 
         # get ssh/gpg document uuids based on the document titles
         for document in op_documents:
-            if document['overview']['title'] == "SSH private key":
-                ssh_key_uuid = document['uuid']
-            if document['overview']['title'] == "GPG private key":
-                gpg_key_uuid = document['uuid']
+            if document['title'] == "SSH private key":
+                ssh_key_uuid = document['id']
+            if document['title'] == "GPG private key":
+                gpg_key_uuid = document['id']
 
         def get_passphrase_from_item(document_uuid):
             """Function to get passphrase from 1password item given its uuid"""
-            process = subprocess.run('op get item ' + document_uuid + " --session " + TOKEN, shell=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+            process = subprocess.run('op item get ' + document_uuid + " --format json --session " + TOKEN, shell=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
             ssh_document = json.loads(process.stdout.decode('utf-8'))
-            for section in ssh_document['details']['sections']:
-                for field in section['fields']:
-                    if field['t'] == 'passphrase':
-                        return field['v']
+            for field in ssh_document['fields']:
+                if field['label'] == 'passphrase':
+                    return field['value']
             return None
 
         # get passphrases
