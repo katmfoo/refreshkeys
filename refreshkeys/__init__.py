@@ -45,7 +45,7 @@ def get_passphrases():
     # get key passphrases from 1password
     try:
         # get list of documents from 1password
-        process = subprocess.run('op document list --format json --session ' + TOKEN, shell=True, stdout=subprocess.PIPE)
+        process = subprocess.run('op document list --format json --session ' + TOKEN, shell=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         op_documents = json.loads(process.stdout.decode('utf-8'))
 
         # get ssh/gpg document uuids based on the document titles
