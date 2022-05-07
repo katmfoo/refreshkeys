@@ -5,6 +5,7 @@ import json
 import subprocess
 import pexpect
 import signal
+import re
 
 # refreshkeys, script to refresh ssh/gpg key passphrases in keychain using 1password
 # source: https://github.com/pricheal/refreshkeys
@@ -120,6 +121,7 @@ def main():
         # output from keychain and print it to standard out
         if i == 0 and eval_mode:
             eval_output = process.before.decode('utf-8').replace('\r', '')
+            eval_output = re.sub(".*Warning.*\n?","", eval_output) # remove lines that contain "Warning"
             print(eval_output)
 
         # send passphrase if necessary, or finish
